@@ -22,57 +22,14 @@
 
 <body>
     <div id="cesiumContainer"></div>
-    <script>
+    <script type="module">
+        import { configureCommonEnvironment, getViewerOptions, configureModelEdgeHighlighting, configureViewerForEdgeHighlighting } from './environment.js';
+
         const localServer = `http://127.0.0.1:5500`; // Adjust this to your local server URL if needed
         (async () => {
-            const esri = await Cesium.ArcGisMapServerImageryProvider.fromUrl('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer');
-            const viewer = new Cesium.Viewer('cesiumContainer', {
-                timeline: false,
-                animation: false,
-                geocoder: false,
-                homeButton: false,
-                sceneModePicker: false,
-                navigationHelpButton: false,
-                baseLayerPicker: false,
-                fullscreenButton: false,
-                skyBox: false,
-                baseLayer: Cesium.ImageryLayer.fromProviderAsync(esri),
-                shadows: true,
-                terrainShadows: Cesium.ShadowMode.ENABLED,
-                terrainProvider: new Cesium.EllipsoidTerrainProvider()
-            });
-
-            // Basic terrain configuration
-            viewer.scene.globe.enableLighting = true;
-            viewer.scene.globe.shadows = Cesium.ShadowMode.DISABLED; // Disabled terrain shadows
-            viewer.scene.globe.terrainExaggeration = 12.0;
-            viewer.scene.globe.terrainExaggerationRelativeHeight = 0.0;
-
-            // Angled lighting setup for better curve visualization
-            const noonLight = new Cesium.DirectionalLight({
-                direction: new Cesium.Cartesian3(0.3, 0.3, -0.9),
-                intensity: 3.0 // Increased for stronger shadows
-            });
-            viewer.scene.light = noonLight;
-            viewer.scene.globe.ambientOcclusionOnly = true;
-            viewer.scene.globe.ambientOcclusionRadius = 0.1; // Reduced for more concentrated shadows
-            viewer.scene.globe.ambientOcclusionIntensity = 0.8; // Increased for less transparent shadows
-
-            // Enhanced shadow settings for curve definition
-            viewer.scene.globe.shadowMapSize = 4096; // Increased for better quality
-            viewer.scene.globe.shadowMapSoftness = 0.03; // Even sharper shadows
-            viewer.scene.globe.shadowMapBias = 0.0001;
-
-            // Enhanced curve visualization settings
-            viewer.scene.globe.baseColor = new Cesium.Color(0.1, 0.1, 0.1, 1.0); // Darker base color
-            viewer.scene.globe.depthTestAgainstTerrain = true;
-            viewer.scene.globe.atmosphereBrightnessShift = 0.02; // Reduced for darker shadows
-            viewer.scene.globe.atmosphereSaturationShift = 1.0; // Increased for more contrast
-
-            // Enhanced normal mapping for curves
-            viewer.scene.globe.enableLighting = true;
-            viewer.scene.globe.normalMap = true;
-            viewer.scene.globe.maximumScreenSpaceError = 0.5; // Higher quality for better curve definition
+            const viewer = new Cesium.Viewer('cesiumContainer', getViewerOptions());
+            await configureCommonEnvironment(viewer);
+            configureViewerForEdgeHighlighting(viewer);
 
             const response = await fetch(`${localServer}/models.json`);
             if (!response.ok) {
@@ -80,30 +37,43 @@
             }
             const modelData = await response.json();
 
-            const center = Cesium.Cartesian3.fromDegrees(modelData[0].lon, modelData[0].lat, modelData[0].height + 1000); // Adjust height for better view
+            // Use the first model's position as the origin
+            const origin = {
+                lon: modelData[0].lon,
+                lat: modelData[0].lat,
+                height: modelData[0].height
+            };
+                
+            const center = Cesium.Cartesian3.fromDegrees(origin.lon, origin.lat, origin.height + 1000);
             viewer.camera.flyTo({
                 destination: center,
                 duration: 2
             });
 
-
             modelData.forEach(item => {
-                const position = Cesium.Cartesian3.fromDegrees(item.lon - 0.006, item.lat - 0.0005, item.height);
+                // Calculate position relative to origin
+                const position = Cesium.Cartesian3.fromDegrees(
+                    origin.lon + (item.lon - origin.lon),
+                    origin.lat + (item.lat - origin.lat),
+                    origin.height + (item.height - origin.height)
+                );
                 const heading = Cesium.Math.toRadians(90 + item.heading);
                 const pitch = 0;
                 const roll = 0;
                 const hpr = new Cesium.HeadingPitchRoll(heading, pitch, roll);
                 const orientation = Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
-
-                viewer.entities.add({
+                
+                const entity = viewer.entities.add({
                     position: position,
                     orientation: orientation,
                     model: {
                         uri: `${localServer}/glb/${item.filename}`,
                     }
                 });
-            });
 
+                // Apply edge highlighting
+                configureModelEdgeHighlighting(entity);
+            });
         })();
     </script>
 </body>

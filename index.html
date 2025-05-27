@@ -23,13 +23,12 @@
 <body>
     <div id="cesiumContainer"></div>
     <script type="module">
-        import { configureCommonEnvironment, getViewerOptions, configureModelEdgeHighlighting, configureViewerForEdgeHighlighting } from './environment.js';
+        import { configureCommonEnvironment, getViewerOptions } from './environment.js';
 
-        const localServer = `https://cesium-seh.vercel.app/`; // Adjust this to your local server URL if needed
+        const localServer = `http://127.0.0.1:5500`; // Adjust this to your local server URL if needed
         (async () => {
             const viewer = new Cesium.Viewer('cesiumContainer', getViewerOptions());
             await configureCommonEnvironment(viewer);
-            configureViewerForEdgeHighlighting(viewer);
 
             const response = await fetch(`${localServer}/models.json`);
             if (!response.ok) {
@@ -70,9 +69,6 @@
                         uri: `${localServer}/glb/${item.filename}`,
                     }
                 });
-
-                // Apply edge highlighting
-                configureModelEdgeHighlighting(entity);
             });
         })();
     </script>
